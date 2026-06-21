@@ -1,0 +1,248 @@
+openapi: 3.1.0
+info:
+  title: Azure Pricing Dashboard API
+  version: 1.0.0
+  description: >
+    Internal API exposed by the backend to the HTML5 frontend. Acts as a caching proxy and
+    computation/export layer over the Azure Retail Prices API. Every returned price carries a
+    currency code, unit of measure, and retrieval timestamp (Constitution Principle I). Missing
+    prices are represented as explicit "not available" states, never zero/blank/fabricated values.
+servers:
+  - url: https://{host}
+    variables:
+      host:
+        default: pricing.example.com
+paths:
+  /api/services:
+    get:
+      summary: >
+        Optional service search/typeahead used inside the region overview to filter the (potentially
+        large) all-services list by name. NOT a precondition for browsing — the region overview returns
+        every service for a region without requiring a search.
+      parameters:
+        - name: armRegionName
+          in: query
+          required: false
+          description: When provided, restrict matches to services available in this region.
+          schema: { type: string }
+        - name: search
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Matching services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items: { type: string }
+  /api/regions:
+    get:
+      summary: List selectable Azure regions (armRegionName + display location)
+      responses:
+        "200":
+          description: Regions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    armRegionName: { type: string }
+                    location: { type: string }
+  /api/regions/{armRegionName}/services:
+    get:
+      summary: >
+        Region-first overview (US1): list ALL Azure services available in the region, each with a
+        representative cost and 1-yr / 3-yr reserved-instance availability indicators. No service
+        pre-selection. This is the landing view; drill into a service via /api/pricing.
+      parameters:
+        - name: armRegionName
+          in: path
+          required: true
+          schema: { type: string }
+        - name: currencyCode
+          in: query
+          required: false
+          schema: { type: string, default: USD }
+      responses:
+        "200":
+          description: All services available in the region with representative pricing
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [armRegionName, services, source, retrievedAt, currencyCode]
+                properties:
+                  armRegionName: { type: string }
+                  location: { type: string }
+                  services:
+                    type: array
+                    items: { $ref: "#/components/schemas/ServiceSummary" }
+                  source: { type: string, example: "Azure Retail Prices API" }
+                  retrievedAt: { type: string, format: date-time }
+                  currencyCode: { type: string }
+                  isStale: { type: boolean }
+        "502":
+          description: Upstream Retail Prices API unavailable (returns stale/empty state, never fabricated prices)
+  /api/pricing:
+    get:
+      summary: >
+        Drill-down (US1): SKU-level comparison rows (PAYG / 1-yr RI / 3-yr RI) for a service within a
+        region, with optional Hybrid Benefit. Reached by clicking a service in the region overview.
+      parameters:
+        - name: serviceName
+          in: query
+          schema: { type: string }
+        - name: armSkuName
+          in: query
+          schema: { type: string }
+        - name: serviceFamily
+          in: query
+          schema: { type: string }
+        - name: armRegionName
+          in: query
+          required: true
+          schema: { type: string }
+        - name: currencyCode
+          in: query
+          required: false
+          schema: { type: string, default: USD }
+        - name: windowsHybridBenefit
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+        - name: sqlHybridBenefit
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Comparison result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingResponse"
+        "400":
+          description: No service/sku/serviceFamily filter provided
+        "502":
+          description: Upstream Retail Prices API unavailable (returns stale/empty state, never fabricated prices)
+  /api/export/{format}:
+    get:
+      summary: Export the current comparison view to CSV or XLSX (lossless to screen)
+      parameters:
+        - name: format
+          in: path
+          required: true
+          schema: { type: string, enum: [csv, xlsx] }
+        - name: serviceName
+          in: query
+          schema: { type: string }
+        - name: armSkuName
+          in: query
+          schema: { type: string }
+        - name: serviceFamily
+          in: query
+          schema: { type: string }
+        - name: armRegionName
+          in: query
+          required: true
+          schema: { type: string }
+        - name: currencyCode
+          in: query
+          schema: { type: string, default: USD }
+        - name: windowsHybridBenefit
+          in: query
+          schema: { type: boolean, default: false }
+        - name: sqlHybridBenefit
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Export file with metadata header/sheet (source, retrievedAt, filters)
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+components:
+  schemas:
+    ServiceSummary:
+      type: object
+      required: [serviceName, serviceFamily, currencyCode, retrievedAt, available]
+      description: >
+        One Azure service available in a region, summarized for the region overview. The
+        representative price is the lowest available PAYG price among the service's SKUs in the
+        region (clearly labelled), used only to rank/preview; exact SKU prices come from drill-down.
+      properties:
+        available: { type: boolean }
+        serviceName: { type: string }
+        serviceFamily: { type: string }
+        skuCount: { type: integer, description: Number of SKUs for this service in the region }
+        representativePrice: { type: number, nullable: true, description: Lowest available PAYG price in region }
+        representativeUnit: { type: string, nullable: true }
+        currencyCode: { type: string }
+        reserved1YAvailable: { type: boolean }
+        reserved3YAvailable: { type: boolean }
+        hybridBenefitEligible: { type: boolean }
+        retrievedAt: { type: string, format: date-time }
+    PricePoint:
+      type: object
+      required: [purchaseOption, currencyCode, unitOfMeasure, retrievedAt, available]
+      properties:
+        available: { type: boolean }
+        purchaseOption: { type: string, enum: [PAYG, RI_1Y, RI_3Y] }
+        price: { type: number, nullable: true }
+        currencyCode: { type: string }
+        unitOfMeasure: { type: string }
+        reservationTerm: { type: string, nullable: true }
+        retrievedAt: { type: string, format: date-time }
+    HybridBenefitResult:
+      type: object
+      properties:
+        windowsApplied: { type: boolean }
+        sqlApplied: { type: boolean }
+        windowsEligible: { type: boolean }
+        sqlEligible: { type: boolean }
+        basePaygPrice: { type: number }
+        eligiblePrice: { type: number, nullable: true }
+        windowsSavings: { type: number }
+        sqlSavings: { type: number }
+        currencyCode: { type: string }
+    ComparisonRow:
+      type: object
+      required: [serviceName, armSkuName, armRegionName, currencyCode, unitOfMeasure, retrievedAt, isStale]
+      properties:
+        serviceName: { type: string }
+        armSkuName: { type: string }
+        armRegionName: { type: string }
+        location: { type: string }
+        unitOfMeasure: { type: string }
+        currencyCode: { type: string }
+        payg: { $ref: "#/components/schemas/PricePoint" }
+        reserved1Y: { $ref: "#/components/schemas/PricePoint" }
+        reserved3Y: { $ref: "#/components/schemas/PricePoint" }
+        hybridBenefit:
+          oneOf:
+            - $ref: "#/components/schemas/HybridBenefitResult"
+            - type: "null"
+        retrievedAt: { type: string, format: date-time }
+        dataAgeSeconds: { type: integer }
+        isStale: { type: boolean }
+    PricingResponse:
+      type: object
+      required: [rows, source, retrievedAt, currencyCode]
+      properties:
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/ComparisonRow" }
+        source: { type: string, example: "Azure Retail Prices API" }
+        retrievedAt: { type: string, format: date-time }
+        currencyCode: { type: string }
+        isStale: { type: boolean }
+        warning: { type: string, nullable: true }

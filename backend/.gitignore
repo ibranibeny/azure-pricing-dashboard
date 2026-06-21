@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Local secrets / env
+.env
+deploy/.env
+
+# Local pricing snapshots (regenerated from the API)
+/data/pricing/*.json
+!/data/pricing/.gitkeep

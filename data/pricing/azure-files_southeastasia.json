@@ -1,0 +1,9 @@
+{
+  "serviceName": "Azure Files",
+  "armRegionName": "southeastasia",
+  "currencyCode": "USD",
+  "source": "Azure Retail Prices API",
+  "apiVersion": "2023-01-01-preview",
+  "retrievedAt": "2026-06-21T04:48:12.683924Z",
+  "pricePoints": []
+}

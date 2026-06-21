@@ -1,0 +1,75 @@
+# Azure Container Instances multi-container group template (rendered by deploy.sh).
+# Placeholders like __APP_IMAGE__ are substituted at deploy time.
+apiVersion: 2021-10-01
+location: __LOCATION__
+name: __CONTAINER_GROUP__
+properties:
+  osType: Linux
+  restartPolicy: OnFailure
+  ipAddress:
+    type: Public
+    dnsNameLabel: __DNS_LABEL__
+    ports:
+      - protocol: tcp
+        port: 80
+      - protocol: tcp
+        port: 443
+  imageRegistryCredentials:
+    - server: __ACR_LOGIN_SERVER__
+      username: __ACR_USERNAME__
+      password: __ACR_PASSWORD__
+  volumes:
+    - name: appdata
+      azureFile:
+        shareName: __APP_SHARE__
+        storageAccountName: __STORAGE_ACCOUNT__
+        storageAccountKey: __STORAGE_KEY__
+    - name: caddydata
+      azureFile:
+        shareName: __CADDY_SHARE__
+        storageAccountName: __STORAGE_ACCOUNT__
+        storageAccountKey: __STORAGE_KEY__
+  containers:
+    - name: app
+      properties:
+        image: __APP_IMAGE__
+        ports:
+          - port: 8000
+            protocol: tcp
+        resources:
+          requests:
+            cpu: 1.0
+            memoryInGB: 1.5
+        environmentVariables:
+          - name: DATA_DIR
+            value: /app/data/pricing
+          - name: DEFAULT_CURRENCY
+            value: __DEFAULT_CURRENCY__
+          - name: CACHE_TTL_SECONDS
+            value: "__CACHE_TTL_SECONDS__"
+        volumeMounts:
+          - name: appdata
+            mountPath: /app/data/pricing
+    - name: caddy
+      properties:
+        image: __CADDY_IMAGE__
+        ports:
+          - port: 80
+            protocol: tcp
+          - port: 443
+            protocol: tcp
+        resources:
+          requests:
+            cpu: 0.5
+            memoryInGB: 0.5
+        environmentVariables:
+          - name: APP_DOMAIN
+            value: __APP_DOMAIN__
+          - name: ACME_EMAIL
+            value: __ACME_EMAIL__
+          - name: CLOUDFLARE_API_TOKEN
+            secureValue: __CLOUDFLARE_API_TOKEN__
+        volumeMounts:
+          - name: caddydata
+            mountPath: /data
+type: Microsoft.ContainerInstance/containerGroups

@@ -1,0 +1,38 @@
+# Caddy + Cloudflare DNS-01 — automatic Let's Encrypt TLS with auto-renewal.
+# HTTP is automatically redirected to HTTPS by Caddy.
+#
+# Requires a Caddy build that includes the Cloudflare DNS provider module, e.g.:
+#   xcaddy build --with github.com/caddy-dns/cloudflare
+# (the deploy image uses caddy:2 with the cloudflare module — see deploy.sh).
+#
+# Environment variables (provided by the container group):
+#   APP_DOMAIN            e.g. pricing.example.com
+#   ACME_EMAIL           contact email for Let's Encrypt
+#   CLOUDFLARE_API_TOKEN scoped token with Zone:DNS:Edit on the domain's zone
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	tls {
+		dns cloudflare {$CLOUDFLARE_API_TOKEN}
+	}
+
+	# Forward everything to the FastAPI app in the same container group.
+	reverse_proxy 127.0.0.1:8000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

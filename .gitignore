@@ -1,0 +1,26 @@
+# --- Spec Kit / agent tooling (not published) ---
+.github/
+
+# --- Secrets & local deploy config ---
+deploy/.env
+**/.env
+!deploy/.env.example
+
+# --- Python ---
+**/.venv/
+**/venv/
+**/__pycache__/
+*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+*.egg-info/
+
+# --- Logs & runtime artifacts ---
+*.log
+backend/_srv.log
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+*.swp

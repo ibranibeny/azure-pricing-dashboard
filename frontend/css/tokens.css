@@ -1,0 +1,81 @@
+/* Design tokens — "command desk" visual language: a dark control bar over a light
+   data canvas, Azure cobalt + a precise meter-teal for savings. Honest, calm, instrumental. */
+:root {
+  color-scheme: light;
+
+  /* Ink + canvas */
+  --ink: #0f1d2e;
+  --ink-soft: #56657c;
+  --surface: #eef2f8;
+  --surface-raised: #ffffff;
+  --surface-alt: #f5f8fd;
+  --line: #d8e0ec;
+  --line-soft: #e9eef6;
+
+  /* Azure accent (the brief's own blue) */
+  --accent: #1f6feb;
+  --accent-deep: #1853bd;
+  --accent-wash: rgba(31, 111, 235, 0.08);
+  --accent-ink: #ffffff;
+
+  /* Instrument greens + caution */
+  --positive: #0d9488;
+  --meter: #0d9488;
+  --meter-soft: rgba(13, 148, 136, 0.16);
+  --warn: #c2410c;
+  --na: #97a1b3;
+
+  /* Command header */
+  --abyss: #0a1628;
+  --abyss-2: #122a45;
+  --on-dark: #eaf1fb;
+  --on-dark-soft: #93a7c4;
+
+  /* Typography */
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Code", ui-monospace, monospace;
+
+  /* Scale */
+  --step--1: clamp(0.78rem, 0.74rem + 0.18vw, 0.85rem);
+  --step-0: clamp(0.94rem, 0.9rem + 0.2vw, 1rem);
+  --step-1: clamp(1.15rem, 1.04rem + 0.5vw, 1.35rem);
+  --step-2: clamp(1.5rem, 1.3rem + 0.9vw, 2rem);
+  --step-3: clamp(2rem, 1.6rem + 1.8vw, 3rem);
+
+  /* Space */
+  --space-1: 0.35rem;
+  --space-2: 0.65rem;
+  --space-3: 1rem;
+  --space-4: 1.6rem;
+  --space-5: 2.5rem;
+
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 2px 6px rgba(13, 29, 46, 0.05), 0 18px 40px -24px rgba(13, 29, 46, 0.35);
+  --ring: 0 0 0 3px rgba(31, 111, 235, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --ink: #e9f0fb;
+    --ink-soft: #9fb0c9;
+    --surface: #070f1c;
+    --surface-raised: #0f1c30;
+    --surface-alt: #13233a;
+    --line: #243349;
+    --line-soft: #1a2740;
+    --accent: #5b9bff;
+    --accent-wash: rgba(91, 155, 255, 0.12);
+    --positive: #2dd4bf;
+    --meter: #2dd4bf;
+    --meter-soft: rgba(45, 212, 191, 0.16);
+    --na: #7e8aa1;
+    --abyss: #060d18;
+    --abyss-2: #0d1f34;
+    --on-dark: #e9f0fb;
+    --on-dark-soft: #8499b6;
+    --shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 18px 40px -24px rgba(0, 0, 0, 0.7);
+  }
+}
