@@ -271,7 +271,11 @@
     var bestTerm = "";
     var reservedCount = 0;
     rows.forEach(function (r) {
-      if (r.payg && r.payg.available && r.payg.price != null) paygs.push(r.payg.price);
+      // Skip free meters (e.g. Delete Operations, "Provisioned IOPS Free") so the headline
+      // reflects the lowest *billable* price instead of collapsing to $0.00.
+      if (r.payg && r.payg.available && r.payg.price != null && r.payg.price > 0) {
+        paygs.push(r.payg.price);
+      }
       if ((r.reserved1Y && r.reserved1Y.available) || (r.reserved3Y && r.reserved3Y.available)) {
         reservedCount++;
       }
@@ -357,7 +361,7 @@
       case "unit":
         return { v: (row.unitOfMeasure || "").toLowerCase(), missing: false };
       case "payg":
-        return priceSortValue(monthlyAmount(row.payg, "payg"));
+        return priceSortValue(monthlyAmount(row.payg, "payg"), true);
       case "reserved1Y":
         return priceSortValue(monthlyAmount(row.reserved1Y, "1y"));
       case "reserved3Y":
@@ -371,8 +375,11 @@
     }
   }
 
-  function priceSortValue(amount) {
+  function priceSortValue(amount, sinkZero) {
     if (amount !== null && amount !== undefined) {
+      // For pay-as-you-go, treat free ($0) meters like missing values so they sink below the
+      // real prices instead of dominating the top of an ascending sort.
+      if (sinkZero && amount === 0) return { v: 0, missing: true };
       return { v: amount, missing: false };
     }
     return { v: 0, missing: true };
