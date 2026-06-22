@@ -16,6 +16,7 @@
     sortKey: "payg", // active sort column
     sortDir: "asc", // "asc" | "desc"; default shows lowest price first
     currencyCode: "USD",
+    rateMode: "unit", // "hourly" (VMs/App Service) | "unit" (storage, bandwidth, ...)
     pageSize: 20, // number, or Infinity for "all"
     page: 0,
   };
@@ -221,25 +222,56 @@
     return !!(point && point.unitOfMeasure && /hour/i.test(point.unitOfMeasure));
   }
 
-  /* Hours per month, on the same 8760 hr/yr basis used for reserved savings. */
-  var HOURS_PER_MONTH = 8760 / 12;
-
-  /* Monthly cost for a price column so PAYG, 1-yr, and 3-yr compare like-for-like:
-       - PAYG hourly meters are scaled up to a month;
-       - reserved prices are full-term totals, so divide across the term's months. */
-  function monthlyAmount(point, kind) {
-    if (!point || !point.available || point.price == null) return null;
-    if (kind === "1y") return point.price / 12;
-    if (kind === "3y") return point.price / 36;
-    if (isHourly(point)) return point.price * HOURS_PER_MONTH;
-    return point.price; // already monthly (or a per-unit/month meter) — show as-is
+  /* A service is shown either per-hour (VMs, App Service, AKS — every PAYG meter is hourly)
+     or per its own native unit (Storage operations, GB/Month, bandwidth ...). The price
+     columns and headers adapt to whichever basis the service actually bills on. */
+  function computeRateMode(rows) {
+    var any = false;
+    var allHourly = true;
+    rows.forEach(function (r) {
+      if (r.payg && r.payg.available && r.payg.price != null) {
+        any = true;
+        if (!isHourly(r.payg)) allHourly = false;
+      }
+    });
+    return any && allHourly ? "hourly" : "unit";
   }
 
-  /* priceCell-style result ({ text, na }) for a column's monthly cost. */
-  function monthlyCell(point, currency, kind) {
-    var v = monthlyAmount(point, kind);
+  /* Amount to display for a price column, on the service's rate basis:
+       - hourly mode: PAYG is already per hour; reserved prices are full-term totals, so
+         divide across the term's hours to get the effective hourly rate;
+       - unit mode: show each meter's raw price in its own native unit (the Unit column
+         spells out the unit), so we never force a misleading monthly figure. */
+  function displayAmount(point, kind, mode) {
+    if (!point || !point.available || point.price == null) return null;
+    mode = mode || state.rateMode || "unit";
+    if (mode === "hourly") {
+      if (kind === "1y") return point.price / TERM_HOURS["1-yr"];
+      if (kind === "3y") return point.price / TERM_HOURS["3-yr"];
+      return point.price;
+    }
+    return point.price;
+  }
+
+  /* priceCell-style result ({ text, na }) for a column on the service's rate basis. */
+  function displayCell(point, currency, kind, mode) {
+    var v = displayAmount(point, kind, mode);
     if (v == null) return { text: window.Api.NA_TOKEN, na: true };
     return { text: window.Api.fmtMoney(v, currency), na: false };
+  }
+
+  /* Retitle the price columns to match the active rate basis (per-hour vs native unit). */
+  function updateRateHeaders(mode) {
+    var suffix = mode === "hourly" ? " / hr" : "";
+    var labels = {
+      payg: "Pay-as-you-go",
+      reserved1Y: "1-year reserved",
+      reserved3Y: "3-year reserved",
+    };
+    Object.keys(labels).forEach(function (key) {
+      var btn = document.querySelector('.th-sort[data-sort="' + key + '"]');
+      if (btn && btn.firstChild) btn.firstChild.nodeValue = labels[key] + suffix;
+    });
   }
 
   /* Honest reserved saving for ONE term vs the SKU's hourly pay-as-you-go rate. */
@@ -361,11 +393,11 @@
       case "unit":
         return { v: (row.unitOfMeasure || "").toLowerCase(), missing: false };
       case "payg":
-        return priceSortValue(monthlyAmount(row.payg, "payg"), true);
+        return priceSortValue(displayAmount(row.payg, "payg"), true);
       case "reserved1Y":
-        return priceSortValue(monthlyAmount(row.reserved1Y, "1y"));
+        return priceSortValue(displayAmount(row.reserved1Y, "1y"));
       case "reserved3Y":
-        return priceSortValue(monthlyAmount(row.reserved3Y, "3y"));
+        return priceSortValue(displayAmount(row.reserved3Y, "3y"));
       case "saves": {
         var best = bestReserved(row);
         return best ? { v: best.pct, missing: false } : { v: 0, missing: true };
@@ -460,7 +492,7 @@
       ].forEach(function (spec) {
         var td = document.createElement("td");
         td.className = "price";
-        var cell = monthlyCell(spec.pt, currency, spec.kind);
+        var cell = displayCell(spec.pt, currency, spec.kind);
         if (cell.na) {
           td.innerHTML = '<span class="na">' + cell.text + "</span>";
         } else {
@@ -600,9 +632,9 @@
     );
   }
 
-  /* Drawer pricing row showing the monthly cost for a column (PAYG / 1-yr / 3-yr). */
-  function monthlyPriceLine(label, pt, currency, kind, note) {
-    var cell = monthlyCell(pt, currency, kind);
+  /* Drawer pricing row showing the cost for a column on the service's rate basis. */
+  function displayPriceLine(label, pt, currency, kind, note) {
+    var cell = displayCell(pt, currency, kind);
     var value = cell.na
       ? '<span class="na">' + cell.text + "</span>"
       : '<span class="mono">' + esc(cell.text) + "</span>";
@@ -639,24 +671,17 @@
 
     html += '<div class="drawer__section">';
     html += '<h3 class="drawer__h">Pricing</h3>';
-    html += monthlyPriceLine(
-      "Pay-as-you-go / mo",
-      row.payg,
-      currency,
-      "payg",
-      isHourly(row.payg) && row.payg.available && row.payg.price != null
-        ? "\u2248 " + window.Api.fmtMoney(row.payg.price, currency) + " / hr"
-        : null
-    );
-    html += monthlyPriceLine(
-      "1-year reserved / mo",
+    var rateSuffix = state.rateMode === "hourly" ? " / hr" : " / " + (row.unitOfMeasure || "unit");
+    html += displayPriceLine("Pay-as-you-go" + rateSuffix, row.payg, currency, "payg", null);
+    html += displayPriceLine(
+      "1-year reserved" + rateSuffix,
       row.reserved1Y,
       currency,
       "1y",
       one ? "\u2248 " + window.Api.fmtMoney(one.effective, currency) + " / hr effective" : null
     );
-    html += monthlyPriceLine(
-      "3-year reserved / mo",
+    html += displayPriceLine(
+      "3-year reserved" + rateSuffix,
       row.reserved3Y,
       currency,
       "3y",
@@ -761,7 +786,9 @@
       }
       state.rows = data.rows;
       state.currencyCode = data.currencyCode;
+      state.rateMode = computeRateMode(data.rows);
       state.page = 0;
+      updateRateHeaders(state.rateMode);
       renderKpis(data.rows, data.currencyCode);
       repaginate();
       show(el("sku-filter"), true);
