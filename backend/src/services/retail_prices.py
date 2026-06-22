@@ -38,6 +38,7 @@ def build_filter(
     arm_sku_name: str | None = None,
     service_family: str | None = None,
     arm_region_name: str | None = None,
+    product_name_contains: str | None = None,
 ) -> str:
     """Build a case-sensitive OData ``$filter`` (preview API is case-sensitive — R1)."""
     clauses: list[str] = []
@@ -49,6 +50,8 @@ def build_filter(
         clauses.append(f"serviceFamily eq '{_odata_escape(service_family)}'")
     if arm_region_name:
         clauses.append(f"armRegionName eq '{_odata_escape(arm_region_name)}'")
+    if product_name_contains:
+        clauses.append(f"contains(productName, '{_odata_escape(product_name_contains)}')")
     return " and ".join(clauses)
 
 
@@ -106,6 +109,7 @@ class RetailPricesClient:
         arm_sku_name: str | None = None,
         service_family: str | None = None,
         arm_region_name: str | None = None,
+        product_name_contains: str | None = None,
         currency_code: str | None = None,
         max_pages: int = 1000,
     ) -> list[NormalizedPrice]:
@@ -116,6 +120,7 @@ class RetailPricesClient:
             arm_sku_name=arm_sku_name,
             service_family=service_family,
             arm_region_name=arm_region_name,
+            product_name_contains=product_name_contains,
         )
         params = {
             "api-version": self._settings.retail_prices_api_version,

@@ -24,6 +24,15 @@ from .deps import get_cache
 
 router = APIRouter(prefix="/api", tags=["pricing"])
 
+# Some catalog services are really a ``productName`` slice of a broader Retail Prices
+# ``serviceName``. The Azure Retail Prices API has no "Azure Files" service — those meters live
+# under ``serviceName = "Storage"`` (productName contains "Files"); likewise ADLS Gen2. Map the
+# friendly label to the real (serviceName, productName-substring) to fetch so prices resolve.
+_SUBSERVICE_MAP: dict[str, tuple[str, str]] = {
+    "Azure Files": ("Storage", "Files"),
+    "Azure Data Lake Storage Gen2": ("Storage", "Data Lake"),
+}
+
 
 def _build_filters(
     serviceName: str | None,
@@ -54,11 +63,22 @@ async def resolve_records(
 ) -> tuple[list[NormalizedPrice], object]:
     """Fetch the relevant normalized rows for the filter set, plus the cache wrapper."""
     if filters.serviceName:
-        cached = await cache.get_snapshot(
-            service_name=filters.serviceName,
-            arm_region_name=filters.armRegionName,
-            currency_code=filters.currencyCode,
-        )
+        sub = _SUBSERVICE_MAP.get(filters.serviceName)
+        if sub is not None:
+            fetch_service_name, product_contains = sub
+            cached = await cache.get_snapshot(
+                service_name=filters.serviceName,
+                arm_region_name=filters.armRegionName,
+                currency_code=filters.currencyCode,
+                fetch_service_name=fetch_service_name,
+                product_contains=product_contains,
+            )
+        else:
+            cached = await cache.get_snapshot(
+                service_name=filters.serviceName,
+                arm_region_name=filters.armRegionName,
+                currency_code=filters.currencyCode,
+            )
         records = list(cached.snapshot.pricePoints)
     else:
         cached = await cache.get_region_snapshot(

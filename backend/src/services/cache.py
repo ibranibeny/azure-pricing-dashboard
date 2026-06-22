@@ -83,6 +83,7 @@ class PricingCache:
         currency: str,
         fetch_service_name: str | None,
         force_refresh: bool,
+        fetch_product_contains: str | None = None,
     ) -> CachedSnapshot:
         key = (storage_service, arm_region_name)
         fallback: PricingSnapshot | None = None
@@ -106,6 +107,7 @@ class PricingCache:
             records: list[NormalizedPrice] = await self._client.fetch(
                 service_name=fetch_service_name,
                 arm_region_name=arm_region_name,
+                product_name_contains=fetch_product_contains,
                 currency_code=currency,
             )
         except RetailPricesError:
@@ -134,14 +136,23 @@ class PricingCache:
         arm_region_name: str,
         currency_code: str | None = None,
         force_refresh: bool = False,
+        fetch_service_name: str | None = None,
+        product_contains: str | None = None,
     ) -> CachedSnapshot:
-        """Drill-down snapshot for one service in one region."""
+        """Drill-down snapshot for one service in one region.
+
+        ``service_name`` is the cache/storage label. When a service is really a ``productName``
+        slice of a broader Retail Prices service (e.g. Azure Files lives under ``Storage``), pass
+        ``fetch_service_name`` (the real serviceName to query) and ``product_contains`` (a
+        productName substring) so only the relevant meters are fetched and persisted.
+        """
         currency = (currency_code or self._settings.default_currency).upper()
         return await self._materialize(
             storage_service=service_name,
             arm_region_name=arm_region_name,
             currency=currency,
-            fetch_service_name=service_name,
+            fetch_service_name=fetch_service_name or service_name,
+            fetch_product_contains=product_contains,
             force_refresh=force_refresh,
         )
 
