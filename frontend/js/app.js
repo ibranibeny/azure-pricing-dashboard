@@ -426,9 +426,20 @@
       // VMs have an armSkuName; multi-dimensional services (storage, bandwidth, ...) don't, so
       // lead with the SKU name and show the specific meter (Read Operations, Data Stored, ...).
       var primary = row.armSkuName || row.skuName || row.meterName || "";
-      var secondary = row.armSkuName ? row.skuName || "" : row.meterName || "";
+      var secondary;
+      if (row.armSkuName) {
+        secondary = row.skuName || "";
+      } else {
+        // Multi-dimensional services can expose the same skuName + meterName under different
+        // product variants (e.g. Azure Files "Files" vs "Files v2"). Append the product so those
+        // rows are distinguishable instead of looking like duplicates.
+        var parts = [];
+        if (row.meterName) parts.push(cleanSku(row.meterName));
+        if (row.productName && row.productName !== row.skuName) parts.push(cleanSku(row.productName));
+        secondary = parts.join(" · ");
+      }
       sku.innerHTML =
-        "<strong>" + esc(cleanSku(primary)) + "</strong><br><small>" + esc(cleanSku(secondary)) + "</small>";
+        "<strong>" + esc(cleanSku(primary)) + "</strong><br><small>" + esc(secondary) + "</small>";
       tr.appendChild(sku);
 
       var unit = document.createElement("td");
