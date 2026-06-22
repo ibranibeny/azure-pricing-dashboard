@@ -18,6 +18,7 @@ class ComparisonRow(BaseModel):
     serviceFamily: str = ""
     armSkuName: str
     skuName: str = ""
+    meterName: str = ""
     productName: str = ""
     armRegionName: str
     location: str = ""

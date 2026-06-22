@@ -79,6 +79,7 @@ def _normalize(item: dict, retrieved_at: datetime) -> NormalizedPrice | None:
         return None
     return NormalizedPrice(
         meterId=item.get("meterId", ""),
+        meterName=item.get("meterName", ""),
         serviceName=item.get("serviceName", ""),
         serviceFamily=item.get("serviceFamily", ""),
         armSkuName=item.get("armSkuName", ""),

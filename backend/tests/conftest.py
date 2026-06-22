@@ -119,6 +119,7 @@ class FakeRetailClient:
         service_family: str | None = None,
         arm_sku_name: str | None = None,
         arm_region_name: str | None = None,
+        product_name_contains: str | None = None,
         currency_code: str | None = None,
     ) -> list[NormalizedPrice]:
         self.calls.append(
@@ -126,6 +127,7 @@ class FakeRetailClient:
                 "service_name": service_name,
                 "arm_sku_name": arm_sku_name,
                 "arm_region_name": arm_region_name,
+                "product_name_contains": product_name_contains,
                 "currency_code": currency_code,
             }
         )
@@ -133,6 +135,8 @@ class FakeRetailClient:
         rows = _vm_rows(region) + _storage_rows(region)
         if service_name:
             rows = [r for r in rows if r.serviceName == service_name]
+        if product_name_contains:
+            rows = [r for r in rows if product_name_contains in r.productName]
         if arm_sku_name:
             rows = [r for r in rows if r.armSkuName == arm_sku_name]
         return rows

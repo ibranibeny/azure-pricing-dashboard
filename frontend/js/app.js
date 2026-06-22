@@ -340,7 +340,7 @@
     var q = state.skuQuery.trim().toLowerCase();
     if (!q) return state.rows;
     return state.rows.filter(function (r) {
-      var hay = [r.skuName, r.armSkuName, r.productName, r.unitOfMeasure]
+      var hay = [r.skuName, r.armSkuName, r.meterName, r.productName, r.unitOfMeasure]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -423,8 +423,12 @@
       tr.setAttribute("aria-label", "Show pricing detail for " + (row.armSkuName || "this SKU"));
 
       var sku = document.createElement("td");
+      // VMs have an armSkuName; multi-dimensional services (storage, bandwidth, ...) don't, so
+      // lead with the SKU name and show the specific meter (Read Operations, Data Stored, ...).
+      var primary = row.armSkuName || row.skuName || row.meterName || "";
+      var secondary = row.armSkuName ? row.skuName || "" : row.meterName || "";
       sku.innerHTML =
-        "<strong>" + esc(cleanSku(row.armSkuName)) + "</strong><br><small>" + esc(cleanSku(row.skuName || "")) + "</small>";
+        "<strong>" + esc(cleanSku(primary)) + "</strong><br><small>" + esc(cleanSku(secondary)) + "</small>";
       tr.appendChild(sku);
 
       var unit = document.createElement("td");

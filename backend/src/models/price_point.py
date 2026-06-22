@@ -35,6 +35,7 @@ class NormalizedPrice(BaseModel):
     """A single normalized row from the Azure Retail Prices API."""
 
     meterId: str = ""
+    meterName: str = ""
     serviceName: str
     serviceFamily: str = ""
     armSkuName: str = ""

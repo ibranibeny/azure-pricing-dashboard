@@ -34,15 +34,21 @@
 
   function fmtMoney(value, currency) {
     if (value === null || value === undefined) return null;
+    // Azure unit prices are frequently sub-cent (e.g. $0.000243 per GiB/Hour, $0.0052 per 10K
+    // operations). With a flat 2 decimals these collapse to "$0.00", so widen the precision for
+    // small non-zero values while keeping normal amounts at 2 decimals.
+    var abs = Math.abs(value);
+    var maxFrac = 2;
+    if (abs > 0 && abs < 1) maxFrac = abs < 0.01 ? 6 : 4;
     try {
       return new Intl.NumberFormat(undefined, {
         style: "currency",
         currency: currency || "USD",
-        maximumFractionDigits: 2,
+        maximumFractionDigits: maxFrac,
         minimumFractionDigits: 2,
       }).format(value);
     } catch (e) {
-      return (currency || "USD") + " " + Number(value).toFixed(2);
+      return (currency || "USD") + " " + Number(value).toFixed(maxFrac);
     }
   }
 

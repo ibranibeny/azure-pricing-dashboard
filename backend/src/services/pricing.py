@@ -15,8 +15,15 @@ from ..models.price_point import NormalizedPrice, PricePoint, PurchaseOption
 
 def _group_key(rec: NormalizedPrice) -> str:
     if rec.armSkuName:
+        # Compute SKUs (VMs) carry one billable dimension per SKU, so PAYG + reserved meters of
+        # the same armSkuName belong on one row.
         return rec.armSkuName
-    return f"{rec.skuName}|{rec.productName}".strip("|")
+    # Multi-dimensional services (Storage, Bandwidth, etc.) expose many distinct meters per
+    # skuName (Read Operations, Write Operations, Data Stored, ...), each with its own unit. Keep
+    # every meter as its own row instead of collapsing them — otherwise we reduce to the single
+    # cheapest meter (usually a $0.00 free-tier operation) and hide every real price.
+    parts = (rec.skuName, rec.productName, rec.meterName, rec.unitOfMeasure)
+    return "|".join(p for p in parts if p)
 
 
 def _is_spot(rec: NormalizedPrice) -> bool:
@@ -74,8 +81,9 @@ def assemble_rows(
             ComparisonRow(
                 serviceName=anchor.serviceName,
                 serviceFamily=anchor.serviceFamily,
-                armSkuName=anchor.armSkuName or key,
+                armSkuName=anchor.armSkuName,
                 skuName=anchor.skuName,
+                meterName=anchor.meterName,
                 productName=anchor.productName,
                 armRegionName=anchor.armRegionName,
                 location=anchor.location,
@@ -91,6 +99,6 @@ def assemble_rows(
             )
         )
 
-    # Stable, user-friendly ordering by SKU name.
-    rows.sort(key=lambda r: (r.serviceName, r.armSkuName))
+    # Stable, user-friendly ordering by SKU name (then meter for multi-dimensional services).
+    rows.sort(key=lambda r: (r.serviceName, r.armSkuName or r.skuName, r.meterName))
     return rows
